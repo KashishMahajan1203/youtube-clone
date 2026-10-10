@@ -33,6 +33,7 @@ import { useUser } from "@/lib/AuthContext";
 import { toast } from "sonner";
 import { getSocket } from "@/lib/socket";
 import NotificationBell from "./NotificationBell";
+import { copyCallLink } from "@/lib/callLink";
 
 interface HeaderProps {
   toggleSidebar?: () => void;
@@ -138,19 +139,10 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
       return;
     }
 
-    // Generate a unique participant ID for this user
-    const participantId = `participant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
     socket.emit('create-room', (response: any) => {
       if (response.roomId) {
-        // Create a unique link for this participant
-        const callUrl = `${window.location.origin}/call/${response.roomId}?participant=${participantId}`;
-        navigator.clipboard.writeText(callUrl).then(() => {
-          toast.success("Video call link copied to clipboard! Share this link with your friend.");
-        }).catch(() => {
-          toast.success("Video call created! Share this link with your friend.");
-        });
-        router.push(`/call/${response.roomId}?participant=${participantId}`);
+        copyCallLink(response.roomId);
+        router.push(`/call/${response.roomId}`);
       } else {
         toast.error("Failed to create room. Please try again.");
       }

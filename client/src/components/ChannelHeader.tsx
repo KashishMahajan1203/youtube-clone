@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Button } from "./ui/button";
 import { Video } from "lucide-react";
-import { toast } from "sonner";
+import { copyCallLink } from "@/lib/callLink";
 import VideoCall from "./VideoCall";
 import ChannelAvatar from "./ChannelAvatar";
 import { v4 as uuidv4 } from 'uuid';
@@ -17,11 +17,7 @@ const ChannelHeader = ({ channel, user, stats }: any) => {
     const newRoomId = uuidv4();
     setRoomId(newRoomId);
     setShowVideoCall(true);
-    const callUrl = `${window.location.origin}/call/${newRoomId}`;
-    navigator.clipboard
-      .writeText(callUrl)
-      .then(() => toast.success("Call link copied to clipboard"))
-      .catch(() => {});
+    copyCallLink(newRoomId);
   };
 
   const name: string = channel?.channelname || "Channel";

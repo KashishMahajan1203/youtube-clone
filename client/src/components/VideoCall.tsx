@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Video, VideoOff, Mic, MicOff, Monitor, Square, Phone, PhoneOff, Play, Copy, Check, User } from 'lucide-react';
 import { toast } from 'sonner';
+import { copyCallLink } from '@/lib/callLink';
+import { BACKEND_URL } from '@/lib/media';
 
 interface VideoCallProps {
   roomId: string;
@@ -50,7 +52,7 @@ const VideoCall: React.FC<VideoCallProps> = ({ roomId, onClose }) => {
   });
 
   useEffect(() => {
-    const newSocket = io(process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5001');
+    const newSocket = io(BACKEND_URL);
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
@@ -101,21 +103,9 @@ const VideoCall: React.FC<VideoCallProps> = ({ roomId, onClose }) => {
   };
 
   const copyRoomId = async () => {
-    // Generate a simple local link for video calls
-    const localUrl = `${window.location.origin}/call/${roomId}`;
-
-    try {
-      await navigator.clipboard.writeText(localUrl);
-      setCopied(true);
-      toast.success('Local video call link copied!');
-      console.log('📋 Local Video Call Link:', localUrl);
-      console.log('💡 To share with others on same network:');
-      console.log('1. Find your computer\'s IP (run: ipconfig in Command Prompt)');
-      console.log('2. Replace localhost with your IP: http://YOUR_IP:3000/call/', roomId);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      toast.error('Failed to copy link');
-    }
+    await copyCallLink(roomId);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (

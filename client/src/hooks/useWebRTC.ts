@@ -1,6 +1,21 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Socket } from 'socket.io-client';
 
+// STUN lets peers discover their public address; that's enough on most home
+// networks. Strict NATs (many offices, some mobile carriers) also need a TURN
+// relay — set NEXT_PUBLIC_TURN_URL / _USERNAME / _CREDENTIAL to add one.
+const ICE_SERVERS: RTCIceServer[] = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  ...(process.env.NEXT_PUBLIC_TURN_URL
+    ? [{
+        urls: process.env.NEXT_PUBLIC_TURN_URL.split(',').map((u) => u.trim()),
+        username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+        credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
+      }]
+    : []),
+];
+
 interface UseWebRTCProps {
   socket: Socket | null;
   roomId: string;
@@ -32,12 +47,7 @@ export const useWebRTC = ({ socket, roomId }: UseWebRTCProps): {
   const srcObjectSetRef = useRef<boolean>(false);
   const localStreamRef = useRef<MediaStream | null>(null);
 
-  const configuration = {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-    ],
-  };
+  const configuration = { iceServers: ICE_SERVERS };
 
   const createPeerConnection = useCallback((peerId: string) => {
     // Check if connection already exists

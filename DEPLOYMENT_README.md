@@ -77,6 +77,20 @@ Add these environment variables in Vercel dashboard:
 - `NEXT_PUBLIC_BACKEND_URL=https://your-render-service.onrender.com`
 - `NEXT_PUBLIC_APP_URL=https://your-project.vercel.app`
 
+`NEXT_PUBLIC_APP_URL` is used for shareable links such as video-call invites.
+
+**Video calls between different networks.** Calls use public STUN servers,
+which work on most home connections. If people on strict networks (offices,
+some mobile carriers) can't see each other, add a TURN relay — e.g. a free
+account at metered.ca or Twilio Network Traversal — with:
+- `NEXT_PUBLIC_TURN_URL=turn:your-turn-host:3478` (comma-separate several URLs)
+- `NEXT_PUBLIC_TURN_USERNAME=...`
+- `NEXT_PUBLIC_TURN_CREDENTIAL=...`
+
+Call links only work once the app is deployed: a link to `localhost` opens
+only on your own computer, and the other person's browser also needs to
+reach the backend and use HTTPS for the camera.
+
 ## Troubleshooting
 
 ### Common Issues:
