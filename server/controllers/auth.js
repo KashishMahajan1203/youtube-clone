@@ -53,18 +53,35 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
+const otpEmailHtml = (otp) => `
+  <div style="font-family:Arial,Helvetica,sans-serif;max-width:460px;margin:0 auto;padding:24px;color:#111">
+    <h2 style="margin:0 0 8px">Your YourTube sign-in code</h2>
+    <p style="margin:0 0 20px;color:#555">Enter this code to finish signing in. It expires in 5 minutes.</p>
+    <div style="font-size:32px;font-weight:bold;letter-spacing:8px;padding:16px;text-align:center;background:#f4f4f6;border-radius:12px">${otp}</div>
+    <p style="margin:20px 0 0;font-size:12px;color:#888">If you didn't try to sign in, you can ignore this email.</p>
+  </div>`;
+
 const sendEmailOTP = async (email, otp) => {
   try {
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: `"YourTube" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: "Your OTP Verification Code",
-      text: `Your OTP for verification is: ${otp}. This code will expire in 5 minutes.`,
+      subject: `${otp} is your YourTube sign-in code`,
+      text: `Your YourTube sign-in code is ${otp}. It expires in 5 minutes.`,
+      html: otpEmailHtml(otp),
     };
-    await transporter.sendMail(mailOptions);
+    const info = await transporter.sendMail(mailOptions);
+    if (process.env.NODE_ENV !== "production") {
+      const self = email.toLowerCase() === (process.env.EMAIL_USER || "").toLowerCase();
+      console.log(
+        `[dev] Gmail ${info.accepted?.length ? "accepted" : "did NOT accept"} the OTP email for ${email}` +
+          (info.rejected?.length ? ` (rejected: ${info.rejected.join(", ")})` : "") +
+          (self ? " — sent to yourself, so Gmail may show it only in Sent/All Mail" : "")
+      );
+    }
     return true;
   } catch (error) {
-    console.error("Email OTP error:", error);
+    console.error("Email OTP error:", error.code || "", error.response || error.message);
     return false;
   }
 };
