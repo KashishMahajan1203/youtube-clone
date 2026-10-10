@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Button } from "./ui/button";
-import { Video } from "lucide-react";
+import { BarChart3, Video } from "lucide-react";
+import Link from "next/link";
 import { copyCallLink } from "@/lib/callLink";
 import VideoCall from "./VideoCall";
 import ChannelAvatar from "./ChannelAvatar";
@@ -81,6 +82,15 @@ const ChannelHeader = ({ channel, user, stats }: any) => {
                 onToggle={subscription.toggle}
                 disabled={subscription.pending}
               />
+            )}
+
+            {isOwner && (
+              <Button asChild className="bg-gradient-brand h-10 gap-2 rounded-full px-5 font-semibold text-white hover:opacity-95">
+                <Link href="/studio">
+                  <BarChart3 className="size-4" />
+                  Studio
+                </Link>
+              </Button>
             )}
 
             {user && (

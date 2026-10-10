@@ -14,6 +14,7 @@ import downloadroutes from "./routes/download.js";
 import subscriptionroutes from "./routes/subscription.js";
 import notificationroutes from "./routes/notification.js";
 import playlistroutes from "./routes/playlist.js";
+import studioroutes from "./routes/studio.js";
 import { getAllowedOrigins } from "./constants/origins.js";
 
 // Required for ES Modules (__dirname replacement)
@@ -26,6 +27,9 @@ const __dirname = path.dirname(__filename);
  */
 export function createApp({ logRequests = true } = {}) {
   const app = express();
+  // Behind Render/other proxies req.ip should be the client, not the proxy
+  // (used to de-duplicate anonymous views).
+  app.set("trust proxy", 1);
 
   /* ===============================
      LOGGING
@@ -89,6 +93,7 @@ export function createApp({ logRequests = true } = {}) {
   app.use("/subscription", subscriptionroutes);
   app.use("/notification", notificationroutes);
   app.use("/playlist", playlistroutes);
+  app.use("/studio", studioroutes);
 
   return app;
 }

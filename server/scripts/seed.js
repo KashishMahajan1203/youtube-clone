@@ -36,7 +36,13 @@ import download from "../Modals/download.js";
 import subscription from "../Modals/subscription.js";
 import playlist from "../Modals/playlist.js";
 import notification from "../Modals/notification.js";
-import { persistUpload, isCloudStorageEnabled, cloudinaryFrameUrl } from "../services/storage.js";
+import view from "../Modals/view.js";
+import {
+  persistUpload,
+  isCloudStorageEnabled,
+  cloudinaryFrameUrl,
+  cloudinaryHlsUrl,
+} from "../services/storage.js";
 import { DEMO_EMAIL_DOMAIN, DEMO_USER } from "../constants/demo.js";
 import { connectDB } from "../services/db.js";
 
@@ -46,6 +52,12 @@ const CLIPS = {
   bunny: "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_5MB.mp4",
   sintel: "https://test-videos.co.uk/vids/sintel/mp4/h264/720/Sintel_720_10s_5MB.mp4",
   jellyfish: "https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_5MB.mp4",
+};
+
+// Without Cloudinary there's nothing to transcode, so Big Buck Bunny videos use
+// Mux's public multi-bitrate test stream to show adaptive (HLS) playback.
+const PUBLIC_HLS = {
+  bunny: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8",
 };
 
 const CREATORS = [
@@ -114,6 +126,20 @@ const VIDEOS = [
   { by: "frames", clip: "bunny", at: 9, category: "Gaming", ago: 26, views: 8120, likes: 702,
     title: "Could Big Buck Bunny be a video game level?",
     description: `Looking at the forest set like a level designer would.\n\nFootage ${BLENDER}` },
+  // The demo account's own channel, so Creator Studio has something to show.
+  { by: "demo", clip: "bunny", at: 3, category: "Education", ago: 75, views: 0, likes: 0,
+    title: "My first upload: testing YourTube",
+    description: `Trying out uploads, thumbnails and adaptive streaming.
+
+Footage ${BLENDER}` },
+  { by: "demo", clip: "jellyfish", at: 2, category: "Science", ago: 40, views: 0, likes: 0,
+    title: "Jellyfish timelapse for focus",
+    description: "Ten calm seconds. Watch it in Creator Studio to see the stats move." },
+  { by: "demo", clip: "sintel", at: 5, category: "Entertainment", ago: 12, views: 0, likes: 0,
+    title: "Sintel: my favourite scene",
+    description: `A short excerpt from the open movie Sintel.
+
+${BLENDER}` },
 ];
 
 const COMMENTS = [
@@ -166,11 +192,93 @@ async function removeSeedData() {
     subscription.deleteMany({ $or: [{ subscriber: { $in: ids } }, { channel: { $in: ids } }] }),
     playlist.deleteMany({ owner: { $in: ids } }),
     notification.deleteMany({ $or: [{ recipient: { $in: ids } }, { actor: { $in: ids } }] }),
+    view.deleteMany({ video: { $in: vids } }),
   ]);
   // Remove the creator accounts; the demo user is kept (same _id, so any
   // existing demo sessions stay valid) but reset below.
   await users.deleteMany({ _id: { $in: ids }, email: { $ne: DEMO_USER.email } });
   return seedVideos.length;
+}
+
+// Deterministic pseudo-random numbers, so every seed run looks the same.
+function mulberry32(a) {
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Backdated views, likes, subscribers and comments for the demo channel, so
+ * Creator Studio charts show realistic growth over the last 90 days.
+ */
+async function seedAnalytics(demo, demoVideos, now) {
+  const rand = mulberry32(42);
+  const VIEWERS = 60;
+  const fans = await users.insertMany(
+    Array.from({ length: VIEWERS }, (_, i) => ({
+      email: `viewer${i + 1}@${DEMO_EMAIL_DOMAIN}`,
+      name: `Viewer ${i + 1}`,
+    }))
+  );
+  const at = (daysAgo) => new Date(now - daysAgo * day - Math.floor(rand() * day));
+
+  const views = [];
+  const likes = [];
+  const subs = [];
+  const notes = [
+    "Loved this, more please!",
+    "Watched it three times already",
+    "Great video quality",
+    "Subscribed, keep going!",
+    "This is so relaxing",
+  ];
+  for (const { doc, created } of demoVideos) {
+    const age = Math.round((now - created) / day);
+    for (let d = age; d >= 0; d--) {
+      // Spike after release, a long tail, and slow channel growth on top.
+      const sinceRelease = age - d;
+      const rate = 4 + 30 * Math.exp(-sinceRelease / 6) + (90 - d) / 12;
+      const count = Math.round(rate * (0.6 + rand() * 0.8));
+      for (let i = 0; i < count; i++) {
+        views.push({
+          video: doc._id,
+          channel: String(demo._id),
+          viewerKey: `seed:${Math.floor(rand() * 5000)}`,
+          createdAt: at(d),
+        });
+      }
+    }
+    const likers = fans.filter(() => rand() < 0.45);
+    for (const fan of likers) {
+      const when = at(age * rand());
+      likes.push({ viewer: fan._id, videoid: doc._id, type: "like", likedon: when, createdAt: when, updatedAt: when });
+    }
+    await video.updateOne({ _id: doc._id }, { $set: { views: views.filter((v) => v.video === doc._id).length, Like: likers.length } });
+    for (const [i, text] of notes.entries()) {
+      if (rand() < 0.6) {
+        await comment.collection.insertOne({
+          videoid: doc._id, userid: fans[i]._id, usercommented: fans[i].name, commentbody: text,
+          city: "", likes: [], dislikes: [], parent: null, pinned: false,
+          ...(() => {
+            const when = at(age * rand());
+            return { commentedon: when, createdAt: when, updatedAt: when };
+          })(),
+        });
+      }
+    }
+  }
+  // Subscribers trickle in, a bit faster recently.
+  for (const fan of fans) {
+    subs.push({ subscriber: fan._id, channel: demo._id, createdAt: at(Math.floor(90 * Math.pow(rand(), 0.7))) });
+  }
+  await view.collection.insertMany(views);
+  if (likes.length) await like.collection.insertMany(likes);
+  await subscription.collection.insertMany(subs);
+  console.log(`  ${views.length} views, ${likes.length} likes, ${subs.length} subscribers`);
 }
 
 export async function seed() {
@@ -198,7 +306,7 @@ export async function seed() {
   const now = Date.now();
   const videoDocs = [];
   for (const v of VIDEOS) {
-    const owner = creators[v.by];
+    const owner = people[v.by];
     const created = new Date(now - v.ago * day);
     const doc = await video.create({
       videotitle: v.title,
@@ -213,12 +321,19 @@ export async function seed() {
       views: v.views,
       Like: v.likes,
       thumbnail: cloud ? cloudinaryFrameUrl(media[v.clip], v.at) : "",
+      hls: cloud ? cloudinaryHlsUrl(media[v.clip]) : PUBLIC_HLS[v.clip] || "",
       thumbnailTime: v.at,
     });
     // timestamps are managed by mongoose; backdate directly for a realistic feed
     await video.collection.updateOne({ _id: doc._id }, { $set: { createdAt: created, updatedAt: created } });
     videoDocs.push(doc);
   }
+
+  console.log("Generating 90 days of channel analytics…");
+  const demoVideos = videoDocs
+    .map((doc, i) => ({ doc, created: new Date(now - VIDEOS[i].ago * day) }))
+    .filter(({ doc }) => doc.uploader === String(demo._id));
+  await seedAnalytics(demo, demoVideos, now);
 
   console.log("Adding comments, subscriptions and a playlist…");
   for (const [i, c] of COMMENTS.entries()) {
@@ -232,6 +347,23 @@ export async function seed() {
       commentedon: new Date(now - (i + 1) * 3 * 60 * 60 * 1000),
     });
   }
+
+  // A creator reply, and a pinned comment, on the first video.
+  const firstComment = await comment.findOne({ videoid: videoDocs[0]._id, userid: demo._id });
+  if (firstComment) {
+    await comment.create({
+      videoid: videoDocs[0]._id,
+      userid: creators.studio._id,
+      usercommented: creators.studio.name,
+      commentbody: "Thank you! Every frame and asset is free to reuse.",
+      parent: firstComment._id,
+      city: "Amsterdam",
+    });
+  }
+  await comment.updateOne(
+    { videoid: videoDocs[0]._id, userid: creators.frames._id },
+    { $set: { pinned: true } }
+  );
 
   // Creators subscribe to each other; the demo user follows two channels.
   const subs = [

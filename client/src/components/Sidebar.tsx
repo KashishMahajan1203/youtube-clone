@@ -9,6 +9,7 @@ import {
   Plus,
   PlaySquare,
   ListVideo,
+  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -176,12 +177,15 @@ const Sidebar = ({ isOpen, closeSidebar }: SidebarProps) => {
               <SectionLabel>You</SectionLabel>
               <div className="space-y-0.5">
                 {user?.channelname ? (
-                  <NavItem
-                    href={channelHref}
-                    icon={UserCircle}
-                    label="Your channel"
-                    active={isActive(channelHref)}
-                  />
+                  <>
+                    <NavItem
+                      href={channelHref}
+                      icon={UserCircle}
+                      label="Your channel"
+                      active={isActive(channelHref)}
+                    />
+                    <NavItem href="/studio" icon={BarChart3} label="Creator Studio" active={isActive("/studio")} />
+                  </>
                 ) : (
                   <button
                     onClick={() => setisdialogeopen(true)}

@@ -6,14 +6,16 @@ const notificationschema = mongoose.Schema(
       ref: "users",
       required: true,
     },
-    type: { type: String, enum: ["upload", "subscribe"], required: true },
-    // Who caused it: the uploading channel, or the new subscriber.
+    type: { type: String, enum: ["upload", "subscribe", "reply"], required: true },
+    // Who caused it: the uploading channel, the new subscriber, or the replier.
     actor: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
     actorName: { type: String, default: "" },
     actorImage: { type: String, default: "" },
     video: { type: mongoose.Schema.Types.ObjectId, ref: "videofiles" },
     videoTitle: { type: String, default: "" },
     thumbnail: { type: String, default: "" },
+    // Reply text (for "reply" notifications).
+    text: { type: String, default: "" },
     read: { type: Boolean, default: false },
   },
   {

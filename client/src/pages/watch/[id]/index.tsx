@@ -188,7 +188,7 @@ const VideoPage = () => {
             </div>
 
             <VideoInfo video={currentVideo} />
-            <Comments videoId={videoId} />
+            <Comments videoId={videoId} uploaderId={currentVideo?.uploader} channelName={currentVideo?.videochanel} />
           </div>
 
           {/* RELATED VIDEOS */}
@@ -234,7 +234,7 @@ const VideoPage = () => {
                 <X className="size-5" />
               </button>
             </div>
-            <Comments videoId={videoId} />
+            <Comments videoId={videoId} uploaderId={currentVideo?.uploader} channelName={currentVideo?.videochanel} />
           </div>
         </div>
       )}

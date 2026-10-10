@@ -1,13 +1,18 @@
+import mongoose from "mongoose";
 import video from "../Modals/video.js";
 import history from "../Modals/history.js";
+import { recordView } from "../services/views.js";
 
 export const handlehistory = async (req, res) => {
   const userId = req.userId; // from the verified session token
   const { videoId } = req.params;
   try {
+    if (!mongoose.Types.ObjectId.isValid(videoId) || !(await video.exists({ _id: videoId }))) {
+      return res.status(404).json({ message: "Video not found" });
+    }
     await history.create({ viewer: userId, videoid: videoId });
-    await video.findByIdAndUpdate(videoId, { $inc: { views: 1 } });
-    return res.status(200).json({ history: true });
+    const counted = await recordView(videoId, { userId });
+    return res.status(200).json({ history: true, counted });
   } catch (error) {
     console.error(" error:", error);
     return res.status(500).json({ message: "Something went wrong" });
@@ -16,8 +21,8 @@ export const handlehistory = async (req, res) => {
 export const handleview = async (req, res) => {
   const { videoId } = req.params;
   try {
-    await video.findByIdAndUpdate(videoId, { $inc: { views: 1 } });
-    return res.status(200).json({ viewed: true });
+    const counted = await recordView(videoId, { ip: req.ip });
+    return res.status(200).json({ viewed: true, counted });
   } catch (error) {
     console.error(" error:", error);
     return res.status(500).json({ message: "Something went wrong" });

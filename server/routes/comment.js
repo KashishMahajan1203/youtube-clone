@@ -1,5 +1,5 @@
 import express from "express";
-import { deletecomment, getallcomment, postcomment, editcomment, likeComment, dislikeComment } from "../controllers/comment.js";
+import { deletecomment, getallcomment, postcomment, editcomment, likeComment, dislikeComment, pincomment } from "../controllers/comment.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const routes = express.Router();
@@ -9,4 +9,5 @@ routes.delete("/deletecomment/:id", requireAuth, deletecomment);
 routes.post("/editcomment/:id", requireAuth, editcomment);
 routes.patch("/like/:id", requireAuth, likeComment);
 routes.patch("/dislike/:id", requireAuth, dislikeComment);
+routes.patch("/pin/:id", requireAuth, pincomment);
 export default routes;

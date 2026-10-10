@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Bell, BellOff, CheckCheck, UserPlus } from "lucide-react";
+import { Bell, BellOff, CheckCheck, MessageSquare, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -16,13 +16,14 @@ import { cn } from "@/lib/utils";
 
 interface Notification {
   _id: string;
-  type: "upload" | "subscribe";
+  type: "upload" | "subscribe" | "reply";
   actor?: string;
   actorName: string;
   actorImage?: string;
   video?: string;
   videoTitle?: string;
   thumbnail?: string;
+  text?: string;
   read: boolean;
   createdAt: string;
 }
@@ -30,10 +31,12 @@ interface Notification {
 const describe = (n: Notification) =>
   n.type === "upload"
     ? `${n.actorName} uploaded: ${n.videoTitle}`
-    : `${n.actorName} subscribed to your channel`;
+    : n.type === "reply"
+      ? `${n.actorName} replied: "${n.text}"`
+      : `${n.actorName} subscribed to your channel`;
 
 const hrefFor = (n: Notification) =>
-  n.type === "upload" && n.video ? `/watch/${n.video}` : n.actor ? `/channel/${n.actor}` : "#";
+  n.type !== "subscribe" && n.video ? `/watch/${n.video}` : n.actor ? `/channel/${n.actor}` : "#";
 
 export default function NotificationBell({ userId }: { userId: string }) {
   const [items, setItems] = useState<Notification[]>([]);
@@ -66,7 +69,7 @@ export default function NotificationBell({ userId }: { userId: string }) {
       setUnread((u) => u + 1);
       toast(describe(n), {
         action: {
-          label: n.type === "upload" ? "Watch" : "View",
+          label: n.type === "upload" ? "Watch" : n.type === "reply" ? "Reply" : "View",
           onClick: () => (window.location.href = hrefFor(n)),
         },
       });
@@ -162,11 +165,14 @@ export default function NotificationBell({ userId }: { userId: string }) {
                     {n.type === "subscribe" && (
                       <UserPlus className="mr-1 inline size-3.5 text-brand" />
                     )}
+                    {n.type === "reply" && (
+                      <MessageSquare className="mr-1 inline size-3.5 text-brand" />
+                    )}
                     {describe(n)}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">{timeAgo(n.createdAt)}</p>
                 </div>
-                {n.type === "upload" && n.thumbnail && (
+                {n.type !== "subscribe" && n.thumbnail && (
                   <img
                     src={mediaUrl(n.thumbnail)}
                     alt=""

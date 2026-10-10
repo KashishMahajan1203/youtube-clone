@@ -1,5 +1,11 @@
 import express from "express";
-import { getallvideo, uploadvideo, watchVideo } from "../controllers/video.js";
+import {
+  getallvideo,
+  uploadvideo,
+  watchVideo,
+  updatevideo,
+  deletevideo,
+} from "../controllers/video.js";
 
 
 import upload from "../filehelper/filehelper.js";
@@ -18,4 +24,6 @@ routes.post(
 );
 routes.get("/getall", getallvideo);
 routes.get("/watch/:videoId", watchVideo); // public: anyone can watch
+routes.patch("/:id", requireAuth, updatevideo); // owner only
+routes.delete("/:id", requireAuth, deletevideo); // owner only
 export default routes;

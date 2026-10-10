@@ -49,3 +49,21 @@ export async function notifyNewSubscriber(channelId, subscriberId) {
     },
   ]);
 }
+
+export async function notifyReply(parentComment, reply, videoDoc) {
+  if (String(parentComment.userid) === String(reply.userid)) return; // replying to yourself
+  const replier = await users.findById(reply.userid).select("channelname name image");
+  await deliver([
+    {
+      recipient: parentComment.userid,
+      type: "reply",
+      actor: reply.userid,
+      actorName: reply.usercommented || replier?.name || "Someone",
+      actorImage: replier?.image || "",
+      video: videoDoc._id,
+      videoTitle: videoDoc.videotitle,
+      thumbnail: videoDoc.thumbnail || "",
+      text: reply.commentbody.slice(0, 200),
+    },
+  ]);
+}

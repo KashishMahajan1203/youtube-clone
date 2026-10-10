@@ -28,6 +28,7 @@ This platform focuses on:
 
 * User engagement through interactive comments and gestures
 * Channel subscriptions, playlists and real-time notifications
+* Creator Studio analytics and adaptive (HLS) video streaming
 * Compliance through moderation and authentication
 * Regional personalization and adaptive UI
 * Secure JWT authentication and automated communication
@@ -45,6 +46,8 @@ This platform focuses on:
   * 👎 Dislike option
   * 🌐 Translate option (user-selectable target language)
   * 📍 Exact **city name** of the commenter (geo-resolved)
+  * 💬 **Replies** in threads (one level deep, like YouTube); the comment's author gets a real-time notification
+  * 📌 The video's creator can **pin** one comment and remove any comment on their video
 
 ### Moderation Rules
 
@@ -109,6 +112,26 @@ If user logs in from:
 ### Other States Login
 
 ➡ OTP is sent via **Mobile Number (SMS)**
+
+---
+
+## 📊 Creator Studio
+
+A dashboard for your own channel at `/studio`:
+
+* Daily **views, new subscribers and likes** for the last 7 / 28 / 90 days, with change vs. the previous period
+* Lifetime totals, like ratio and **top videos** for the period
+* Manage uploads: **edit** title, description and category, or **delete** a video (its comments, likes, stats and playlist entries go with it)
+* Built on MongoDB aggregation pipelines, bucketed by day in the viewer's time zone
+* Views are de-duplicated: the same viewer (account, or hashed IP when signed out) counts once per 30 minutes
+
+---
+
+## 📶 Adaptive Streaming (HLS)
+
+* Videos uploaded to Cloudinary get an **HLS** manifest (`sp_auto`) with several resolutions, generated in the background at upload time
+* The player uses **hls.js** to switch quality automatically with the connection, and a **quality menu** (Auto, 1080p … 144p) lets viewers pin one
+* Falls back to the original MP4 if the stream isn't ready or the browser can't play it
 
 ---
 

@@ -87,7 +87,7 @@ test("unsubscribe", async () => {
 
 /* ---------------- comments ---------------- */
 
-test("comments: author comes from the token; only the author can edit/delete", async () => {
+test("comments: author comes from the token; only the author can edit, the creator can also delete", async () => {
   assert.equal(
     (await t.api("POST", "/comment/postcomment", { body: { videoid: videoId, commentbody: "hi" } })).status,
     401
@@ -104,7 +104,8 @@ test("comments: author comes from the token; only the author can edit/delete", a
   const edit = (token, text) =>
     t.api("POST", `/comment/editcomment/${c._id}`, { token, body: { commentbody: text } });
   assert.equal((await edit(alice.token, "hacked")).status, 404);
-  assert.equal((await t.api("DELETE", `/comment/deletecomment/${c._id}`, { token: alice.token })).status, 404);
+  const stranger = await t.createUser({ name: "Stranger" });
+  assert.equal((await t.api("DELETE", `/comment/deletecomment/${c._id}`, { token: stranger.token })).status, 404);
 
   const ok = await edit(bob.token, "Nice!!");
   assert.equal(ok.data.commentbody, "Nice!!");

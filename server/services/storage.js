@@ -50,7 +50,14 @@ export async function persistUpload(localPath, kind) {
           await new Promise((resolve, reject) =>
             cloudinary.uploader.upload_large(
               localPath,
-              { ...options, chunk_size: 20 * 1024 * 1024 },
+              {
+                ...options,
+                chunk_size: 20 * 1024 * 1024,
+                // Pre-build the adaptive-bitrate (HLS) renditions in the
+                // background so the first viewer doesn't wait for them.
+                eager: [{ streaming_profile: "auto", format: "m3u8" }],
+                eager_async: true,
+              },
               (err, res) => (err ? reject(err) : resolve(res))
             )
           )
@@ -75,4 +82,29 @@ export function cloudinaryFrameUrl(videoUrl, seconds = 1) {
   return videoUrl
     .replace("/video/upload/", `/video/upload/so_${seconds}/`)
     .replace(/\.[a-z0-9]+(\?.*)?$/i, ".jpg");
+}
+
+// Adaptive streaming manifest for a Cloudinary video: Cloudinary transcodes it
+// into several resolutions and the player picks one to suit the connection.
+// .../video/upload/v1/<id>.mp4  →  .../video/upload/sp_auto/v1/<id>.m3u8
+export function cloudinaryHlsUrl(videoUrl) {
+  if (!videoUrl?.includes("res.cloudinary.com") || !videoUrl.includes("/video/upload/")) return "";
+  return videoUrl
+    .replace("/video/upload/", "/video/upload/sp_auto/")
+    .replace(/\.[a-z0-9]+(\?.*)?$/i, ".m3u8");
+}
+
+/** Best-effort removal of a stored file (Cloudinary asset or local upload). */
+export async function deleteStored(fileUrl, kind) {
+  if (!fileUrl) return;
+  if (!isRemoteUrl(fileUrl)) return discardLocal(fileUrl);
+  if (!fileUrl.includes("res.cloudinary.com") || !isCloudStorageEnabled()) return;
+  // public id = path after /upload/[transformations/][v123/], minus extension
+  const match = fileUrl.match(/\/upload\/(?:[^/]*_[^/]*\/)*(?:v\d+\/)?(.+?)\.[a-z0-9]+$/i);
+  if (!match) return;
+  try {
+    await cloudinary.uploader.destroy(match[1], { resource_type: kind, invalidate: true });
+  } catch (err) {
+    console.error("Cloudinary delete failed:", err?.message || err);
+  }
 }
