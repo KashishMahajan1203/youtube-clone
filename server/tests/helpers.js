@@ -1,5 +1,6 @@
 // Test harness: the real Express app + Socket.IO on a random port, backed by
 // an in-memory MongoDB. Each test file gets its own isolated database.
+import "./env.js"; // must stay first: isolates tests from server/.env
 import { createServer } from "http";
 import fs from "fs";
 import path from "path";

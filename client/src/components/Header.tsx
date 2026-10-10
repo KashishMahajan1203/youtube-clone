@@ -260,9 +260,6 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
                   <div className="min-w-0">
                     <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
                       {user.name}
-                      {user.isPremium && (
-                        <ShieldCheck className="size-3.5 shrink-0 text-amber-400" />
-                      )}
                     </p>
                     <p className="truncate text-xs font-normal text-muted-foreground">
                       {user.email}

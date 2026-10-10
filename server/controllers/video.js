@@ -1,7 +1,5 @@
 import video from "../Modals/video.js";
-import watchsession from "../Modals/watchsession.js";
 import users from "../Modals/Auth.js";
-import { PLAN_RULES } from "../constants/plans.js";
 import { CATEGORIES } from "../constants/categories.js";
 import { persistUpload, discardLocal, isRemoteUrl } from "../services/storage.js";
 import { notifyNewUpload } from "../services/notifications.js";
@@ -76,88 +74,6 @@ export const watchVideo = async (req, res) => {
     res.sendFile(filePath, { root: "." });
   } catch (error) {
     console.error("Watch video error:", error);
-    return res.status(500).json({ message: "Something went wrong" });
-  }
-};
-
-export const updateWatchTime = async (req, res) => {
-  const { videoId } = req.params;
-  const userId = req.userId; // from the verified session token
-  const { watchTime } = req.body;
-
-  try {
-    // Validate inputs
-    if (!videoId || !userId || watchTime === undefined) {
-      return res.status(400).json({ message: "Missing required parameters" });
-    }
-
-    // Get user and check plan
-    const user = await users.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    // Check if plan is expired
-    const currentDate = new Date();
-    if (user.plan !== "FREE" && user.planExpiry && user.planExpiry < currentDate) {
-      await users.findByIdAndUpdate(userId, { plan: "FREE", planExpiry: null });
-      user.plan = "FREE";
-    }
-
-    const planRules = PLAN_RULES[user.plan];
-    if (!planRules) {
-      return res.status(400).json({ message: "Invalid plan" });
-    }
-
-    // For unlimited plans, allow unlimited watch time
-    if (planRules.maxWatchTime === Infinity) {
-      return res.status(200).json({
-        message: "Watch time updated",
-        remainingTime: Infinity,
-        unlimited: true
-      });
-    }
-
-    // Get or create watch session
-    let session = await watchsession.findOne({ userId, videoId });
-    if (!session) {
-      session = new watchsession({
-        userId,
-        videoId,
-        watchTime: 0,
-        lastWatched: new Date()
-      });
-    }
-
-    // Update watch time (only if it's greater than current)
-    if (watchTime > session.watchTime) {
-      session.watchTime = watchTime;
-      session.lastWatched = new Date();
-      await session.save();
-    }
-
-    // Calculate remaining time
-    const remainingTime = Math.max(0, planRules.maxWatchTime - session.watchTime);
-
-    // Check if limit exceeded (but allow initialization with watchTime 0)
-    if (remainingTime <= 0 && watchTime > 0) {
-      return res.status(403).json({
-        message: "Watch time limit exceeded. Upgrade to premium for more watch time.",
-        remainingTime: 0,
-        limitExceeded: true,
-        upgradeRequired: true
-      });
-    }
-
-    return res.status(200).json({
-      message: "Watch time updated",
-      remainingTime,
-      watchedTime: session.watchTime,
-      maxTime: planRules.maxWatchTime
-    });
-
-  } catch (error) {
-    console.error("Update watch time error:", error);
     return res.status(500).json({ message: "Something went wrong" });
   }
 };

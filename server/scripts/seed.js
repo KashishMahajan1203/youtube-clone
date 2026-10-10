@@ -187,10 +187,9 @@ export async function seed() {
     const { key, ...data } = c;
     creators[key] = await users.create(data);
   }
-  const farFuture = new Date(Date.now() + 3650 * day);
   const demo = await users.findOneAndUpdate(
     { email: DEMO_USER.email },
-    { $set: { ...DEMO_USER, plan: "GOLD", planExpiry: farFuture } },
+    { $set: DEMO_USER },
     { upsert: true, new: true }
   );
   const people = { ...creators, demo };

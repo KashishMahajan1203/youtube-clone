@@ -1,5 +1,4 @@
 import download from "../Modals/download.js";
-import users from "../Modals/Auth.js";
 
 export const handledownload = async (req, res) => {
     const userId = req.userId; // from the verified session token
@@ -13,26 +12,6 @@ export const handledownload = async (req, res) => {
             await download.findByIdAndDelete(existingDownload._id);
             return res.status(200).json({ downloaded: false });
         } else {
-            // Check if user is premium
-            const user = await users.findById(userId);
-            const isPremium = user && user.isPremium && user.premiumExpiry > new Date();
-
-            if (!isPremium) {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-
-                const downloadCount = await download.countDocuments({
-                    viewer: userId,
-                    createdAt: { $gte: today },
-                });
-
-                if (downloadCount >= 1) {
-                    return res
-                        .status(400)
-                        .json({ message: "You can only download one video per day. Upgrade to premium for unlimited downloads." });
-                }
-            }
-
             await download.create({ viewer: userId, videoid: videoId });
             return res.status(200).json({ downloaded: true });
         }

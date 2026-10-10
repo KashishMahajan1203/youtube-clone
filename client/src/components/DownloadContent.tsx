@@ -2,11 +2,9 @@ import { useUser } from "@/lib/AuthContext";
 import axiosInstance from "@/lib/axiosinstance";
 import React, { useEffect, useState } from "react";
 import Videogrid from "./Videogrid";
-import { Crown, Download, Sparkles } from "lucide-react";
+import { Download } from "lucide-react";
 import EmptyState from "./EmptyState";
 import { VideoGridSkeleton } from "./Skeletons";
-import PremiumPayment from "./PremiumPayment";
-import { Button } from "./ui/button";
 
 export default function DownloadContent() {
     const { user } = useUser();
@@ -59,45 +57,15 @@ export default function DownloadContent() {
         );
     }
 
-    const upgrade = (label: string) => (
-        <PremiumPayment
-            trigger={
-                <Button className="bg-gradient-brand h-10 gap-2 rounded-full px-5 font-semibold text-white shadow-lg shadow-brand/25 hover:opacity-95">
-                    <Sparkles className="size-4" />
-                    {label}
-                </Button>
-            }
-        />
-    );
+    if (videos.length === 0) {
+        return (
+            <EmptyState
+                icon={Download}
+                title="No downloaded videos yet"
+                description="Hit “Download” under any video and it will show up here."
+            />
+        );
+    }
 
-    return (
-        <div className="space-y-8">
-            <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/[0.08] bg-surface p-5">
-                <div className="flex items-center gap-3">
-                    <div className={`flex size-10 items-center justify-center rounded-xl ${user?.isPremium ? "bg-amber-400/15 text-amber-300" : "bg-white/[0.06] text-muted-foreground"}`}>
-                        {user?.isPremium ? <Crown className="size-5" /> : <Download className="size-5" />}
-                    </div>
-                    <div>
-                        <p className="text-sm font-semibold">
-                            {user?.isPremium ? "Premium plan" : "Free plan"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                            {user?.isPremium ? "Unlimited downloads available" : "1 download per day"}
-                        </p>
-                    </div>
-                </div>
-                {!user?.isPremium && upgrade("Upgrade for unlimited")}
-            </div>
-
-            {videos.length === 0 ? (
-                <EmptyState
-                    icon={Download}
-                    title="No downloaded videos yet"
-                    description="Download videos to watch them offline. Free users can download 1 video per day."
-                />
-            ) : (
-                <Videogrid videos={videos} />
-            )}
-        </div>
-    );
+    return <Videogrid videos={videos} />;
 }

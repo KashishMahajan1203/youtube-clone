@@ -348,7 +348,7 @@ export const updateprofile = async (req, res) => {
   }
 };
 
-// Public channel info (no email, mobile or plan details).
+// Public channel info (no email or mobile).
 export const getchannel = async (req, res) => {
   const { id: _id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(_id)) {
@@ -369,7 +369,7 @@ export const getchannel = async (req, res) => {
 };
 
 // Current user, from the session token. Used to validate a stored session
-// and refresh profile/plan data on page load.
+// and refresh profile data on page load.
 export const getme = async (req, res) => {
   try {
     const user = await users.findById(req.userId);
@@ -385,21 +385,15 @@ export const getme = async (req, res) => {
 
 // One-click sign-in to a shared demo account, so visitors (e.g. recruiters)
 // can try the app without Google sign-in and OTP. Disable with
-// ENABLE_DEMO_LOGIN=false. The demo account gets the GOLD plan so watch-time
-// limits don't get in the way.
+// ENABLE_DEMO_LOGIN=false.
 export const demologin = async (req, res) => {
   if (!isDemoLoginEnabled()) {
     return res.status(404).json({ message: "Demo login is disabled" });
   }
   try {
-    const farFuture = new Date();
-    farFuture.setFullYear(farFuture.getFullYear() + 10);
     const user = await users.findOneAndUpdate(
       { email: DEMO_USER.email },
-      {
-        $setOnInsert: DEMO_USER,
-        $set: { plan: "GOLD", planExpiry: farFuture },
-      },
+      { $setOnInsert: DEMO_USER },
       { upsert: true, new: true }
     );
     return res.status(200).json({ result: user, token: signToken(user._id), demo: true });

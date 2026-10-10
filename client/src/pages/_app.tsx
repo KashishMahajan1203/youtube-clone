@@ -23,7 +23,7 @@ export default function App({ Component, pageProps }: AppProps) {
           <title>YourTube — Video streaming platform</title>
           <meta
             name="description"
-            content="A full-stack video streaming platform with real-time comments, translation, premium plans and WebRTC video calls."
+            content="A full-stack video streaming platform with real-time notifications, playlists, comment translation and WebRTC video calls."
           />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <meta name="theme-color" content="#0a0a0d" />

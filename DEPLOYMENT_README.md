@@ -145,7 +145,7 @@ Blender open movies), comments, subscriptions and a public playlist. Running
 it again resets only the seed data; real users' data is never touched.
 
 The **Try demo** button signs visitors into a shared account
-(`demo@demo.yourtube.dev`, GOLD plan) without Google sign-in or OTP — handy
+(`demo@demo.yourtube.dev`) without Google sign-in or OTP — handy
 for recruiters. Disable it with `ENABLE_DEMO_LOGIN=false`. Because the
 account is shared, re-run `npm run seed` occasionally to reset it.
 

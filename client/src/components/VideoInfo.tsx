@@ -14,7 +14,6 @@ import { useUser } from "@/lib/AuthContext";
 import axiosInstance from "@/lib/axiosinstance";
 import { toast } from "sonner";
 import { useRouter } from "next/router";
-import PremiumPayment from "./PremiumPayment";
 import SubscribeButton from "./SubscribeButton";
 import SaveToPlaylistDialog from "./SaveToPlaylistDialog";
 import Link from "next/link";
@@ -131,29 +130,8 @@ const VideoInfo = ({ video }: any) => {
         toast.info("Video removed from downloads");
       }
     } catch (error: any) {
-      if (error.response && error.response.data && error.response.data.message) {
-        if (error.response.data.message.includes("Upgrade to premium")) {
-          // Show premium upgrade dialog
-          toast.error("Download limit reached", {
-            description: "Upgrade to premium for unlimited downloads.",
-            action: {
-              label: "Upgrade Now",
-              onClick: () => {
-                // Trigger premium payment dialog
-                const premiumButton = document.querySelector('[data-premium-trigger]');
-                if (premiumButton) {
-                  (premiumButton as HTMLElement).click();
-                }
-              },
-            },
-          });
-        } else {
-          toast.error(error.response.data.message);
-        }
-      } else {
-        console.log(error);
-        toast.error("An error occurred while handling download");
-      }
+      console.log(error);
+      toast.error(error?.response?.data?.message || "An error occurred while handling download");
     }
   };
 
@@ -278,16 +256,6 @@ const VideoInfo = ({ video }: any) => {
           </Button>
         </div>
       </div>
-      <PremiumPayment
-        trigger={
-          <Button
-            data-premium-trigger
-            style={{ display: 'none' }}
-          >
-            Upgrade to Premium
-          </Button>
-        }
-      />
       <div className="rounded-2xl border border-white/[0.06] bg-surface p-4 transition-colors hover:bg-surface-2">
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm font-semibold">
           <span>{video.views.toLocaleString()} views</span>

@@ -11,7 +11,6 @@ import watchlaterroutes from "./routes/watchlater.js";
 import historyroutes from "./routes/history.js";
 import commentroutes from "./routes/comment.js";
 import downloadroutes from "./routes/download.js";
-import paymentroutes from "./routes/payment.js";
 import subscriptionroutes from "./routes/subscription.js";
 import notificationroutes from "./routes/notification.js";
 import playlistroutes from "./routes/playlist.js";
@@ -87,7 +86,6 @@ export function createApp({ logRequests = true } = {}) {
   app.use("/history", historyroutes);
   app.use("/comment", commentroutes);
   app.use("/download", downloadroutes);
-  app.use("/payment", paymentroutes);
   app.use("/subscription", subscriptionroutes);
   app.use("/notification", notificationroutes);
   app.use("/playlist", playlistroutes);

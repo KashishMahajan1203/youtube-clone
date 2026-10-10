@@ -50,10 +50,8 @@ test("unknown categories fall back to Other", async () => {
   assert.equal(v.category, "Other");
 });
 
-test("streaming requires a token, and accepts ?token= for <video> tags", async () => {
-  assert.equal((await fetch(`${t.base}/video/watch/${videoId}`)).status, 401);
-  const ok = await fetch(`${t.base}/video/watch/${videoId}?token=${bob.token}`);
-  assert.equal(ok.status, 200);
+test("anyone can stream a video, signed in or not", async () => {
+  assert.equal((await fetch(`${t.base}/video/watch/${videoId}`)).status, 200);
 });
 
 test("history is recorded for the token's user and private to them", async () => {
@@ -103,7 +101,15 @@ test("watch later toggles", async () => {
   assert.equal(r.data.watchlater, false);
 });
 
-test("payments require a token", async () => {
-  const r = await t.api("POST", "/payment/create-order", { body: { plan: "GOLD", userId: bob.id } });
-  assert.equal(r.status, 401);
+test("downloads have no daily limit", async () => {
+  const v2 = (await t.api("GET", "/video/getall")).data.find((x) => x.videotitle === "Odd")._id;
+  assert.equal((await t.api("POST", `/download/${videoId}`, { token: bob.token, body: {} })).data.downloaded, true);
+  assert.equal((await t.api("POST", `/download/${v2}`, { token: bob.token, body: {} })).data.downloaded, true);
+  const list = await t.api("GET", `/download/getall/${bob.id}`, { token: bob.token });
+  assert.equal(list.data.length, 2);
+  assert.equal((await t.api("GET", `/download/getall/${bob.id}`, { token: alice.token })).status, 403);
+});
+
+test("payment endpoints no longer exist", async () => {
+  assert.equal((await t.api("POST", "/payment/create-order", { body: {} })).status, 404);
 });

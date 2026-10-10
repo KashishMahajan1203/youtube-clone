@@ -65,11 +65,10 @@ test("public channel endpoint hides private fields", async () => {
   assert.equal((await t.api("GET", "/user/channel/000000000000000000000000")).status, 404);
 });
 
-test("demo login issues a working session on a GOLD plan", async () => {
+test("demo login issues a working session", async () => {
   const r = await t.api("POST", "/user/demo-login");
   assert.equal(r.status, 200);
   assert.equal(r.data.result.email, DEMO_USER_EMAIL);
-  assert.equal(r.data.result.plan, "GOLD");
   const me = await t.api("GET", "/user/me", { token: r.data.token });
   assert.equal(me.data.result.email, DEMO_USER_EMAIL);
 

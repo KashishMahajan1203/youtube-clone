@@ -7,7 +7,6 @@ import {
   X,
   Download,
   Plus,
-  Sparkles,
   PlaySquare,
   ListVideo,
   type LucideIcon,
@@ -17,7 +16,6 @@ import { useRouter } from "next/router";
 import React, { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import Channeldialogue from "./channeldialogue";
-import PremiumPayment from "./PremiumPayment";
 import Logo from "./Logo";
 import ChannelAvatar from "./ChannelAvatar";
 import { useSubscribedChannels } from "@/hooks/useSubscribedChannels";
@@ -200,26 +198,6 @@ const Sidebar = ({ isOpen, closeSidebar }: SidebarProps) => {
                 <NavItem href="/downloads" icon={Download} label="Downloads" active={isActive("/downloads")} />
               </div>
 
-              {!user.isPremium && (
-                <div className="relative mt-6 overflow-hidden rounded-2xl border border-white/10 bg-surface p-4">
-                  <div className="bg-gradient-brand absolute -right-8 -top-8 size-24 rounded-full opacity-25 blur-2xl" />
-                  <Sparkles className="relative mb-2 size-5 text-amber-300" />
-                  <p className="relative text-sm font-semibold">Go Premium</p>
-                  <p className="relative mt-1 text-xs leading-relaxed text-muted-foreground">
-                    Unlimited downloads and longer watch time.
-                  </p>
-                  <PremiumPayment
-                    trigger={
-                      <Button
-                        size="sm"
-                        className="bg-gradient-brand relative mt-3 h-8 w-full rounded-full text-xs font-semibold text-white hover:opacity-95"
-                      >
-                        See plans
-                      </Button>
-                    }
-                  />
-                </div>
-              )}
             </>
           ) : (
             <div className="mt-6 rounded-2xl border border-white/10 bg-surface p-4">

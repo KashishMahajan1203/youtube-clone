@@ -7,15 +7,6 @@ const userschema = mongoose.Schema({
   image: { type: String },
   mobile: { type: String },
   joinedon: { type: Date, default: Date.now },
-  plan: {
-    type: String,
-    enum: ["FREE", "BRONZE", "SILVER", "GOLD"],
-    default: "FREE"
-  },
-  planExpiry: {
-    type: Date,
-    default: null
-  }
 });
 
 export default mongoose.model("users", userschema);

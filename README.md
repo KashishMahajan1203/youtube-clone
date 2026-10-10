@@ -2,10 +2,9 @@
 
 # 🎥 Intelligent Video Streaming Platform
 
-A scalable, feature-rich video streaming web application designed to deliver localized, secure, and premium user experiences. The platform integrates advanced comment moderation, multilingual translation, secure payment workflows, adaptive theming, gesture-based video controls, and VoIP capabilities.
+A scalable, feature-rich video streaming web application designed to deliver localized and secure user experiences. The platform integrates advanced comment moderation, multilingual translation, subscriptions and playlists, real-time notifications, gesture-based video controls, and VoIP capabilities.
 
 ---
-
 ## 📸 Screenshots
 ### 📝 Before Login
 ![Before Login](https://res.cloudinary.com/dfacldueh/image/upload/v1769492033/Screenshot_2026-01-27_105019_surpyw.png)
@@ -28,10 +27,10 @@ A scalable, feature-rich video streaming web application designed to deliver loc
 This platform focuses on:
 
 * User engagement through interactive comments and gestures
-* Monetization via tier-based subscriptions
+* Channel subscriptions, playlists and real-time notifications
 * Compliance through moderation and authentication
 * Regional personalization and adaptive UI
-* Secure payments and automated communication
+* Secure JWT authentication and automated communication
 
 ---
 
@@ -65,52 +64,9 @@ This platform focuses on:
 
 ## 📥 Video Download Feature
 
-### Free Plan
-
-* Users can download **only one video per day**
-* Downloaded videos are:
-
-  * Stored locally
-  * Displayed in the **User Profile → Downloads** section
-
-### Premium Access
-
-* Unlimited video downloads
-* Triggered via **Premium Upgrade**
-* Payment gateway: **Razorpay (Test Mode)**
-
-### Payment Workflow
-
-* User clicks **Premium Plan**
-* Razorpay test payment is initiated
-* Upon successful payment:
-
-  * Unlimited downloads are enabled
-  * Access rights are updated immediately
-
----
-
-## 💳 Subscription Plans & Watch Limits
-
-| Plan   | Watch Time Limit | Price |
-| ------ | ---------------- | ----- |
-| Free   | 5 minutes        | ₹0    |
-| Bronze | 7 minutes        | ₹10   |
-| Silver | 10 minutes       | ₹50   |
-| Gold   | Unlimited        | ₹100  |
-
-### Plan Upgrade Features
-
-* Seamless upgrade from Free to Bronze / Silver / Gold
-* Razorpay payment integration
-* Plan entitlements applied instantly
-
-### Email Notification
-
-* On successful payment:
-
-  * User receives a **confirmation email**
-  * An **invoice** is automatically generated and attached
+* Save any video to your **Downloads** library with one click
+* Downloaded videos are listed in the **Downloads** section
+* No daily limits
 
 ---
 
@@ -199,7 +155,8 @@ A fully customized video player with intuitive gesture interactions:
 * Express.js
 * MongoDB / Mongoose
 * JWT Authentication
-* Razorpay SDK
+* Socket.IO (real-time notifications)
+* Cloudinary (media storage)
 * Email & SMS services
 
 ---
@@ -231,9 +188,11 @@ A fully customized video player with intuitive gesture interactions:
 
 * Email alerts for:
 
-  * Successful payments
   * OTP verification
-  * Invoice delivery
+* In-app, real-time notifications for:
+
+  * New uploads from subscribed channels
+  * New subscribers
 * SMS alerts for:
 
   * OTP verification (non-southern states)

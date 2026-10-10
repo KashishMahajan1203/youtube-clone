@@ -1,17 +1,14 @@
 import { verifyToken } from "../services/token.js";
 
-// Reads "Authorization: Bearer <jwt>". Media URLs used directly by <video>
-// can't set headers, so routes that opt in may also accept ?token=<jwt>.
-function readToken(req, allowQuery) {
+// Reads "Authorization: Bearer <jwt>".
+function readToken(req) {
   const header = req.headers.authorization || "";
-  if (header.startsWith("Bearer ")) return header.slice(7).trim();
-  if (allowQuery && typeof req.query.token === "string") return req.query.token;
-  return null;
+  return header.startsWith("Bearer ") ? header.slice(7).trim() : null;
 }
 
-function authenticate({ required, allowQuery = false }) {
+function authenticate({ required }) {
   return (req, res, next) => {
-    const token = readToken(req, allowQuery);
+    const token = readToken(req);
     const userId = verifyToken(token);
     if (userId) {
       req.userId = userId;
@@ -27,9 +24,6 @@ function authenticate({ required, allowQuery = false }) {
 
 /** Rejects the request with 401 unless a valid token is present. Sets req.userId. */
 export const requireAuth = authenticate({ required: true });
-
-/** Same as requireAuth, but also accepts ?token= (for media streams). */
-export const requireAuthMedia = authenticate({ required: true, allowQuery: true });
 
 /** Sets req.userId when a valid token is present; never rejects. */
 export const optionalAuth = authenticate({ required: false });
