@@ -14,6 +14,8 @@ const videochema = mongoose.Schema(
     description: { type: String, default: "", maxlength: 5000 },
     category: { type: String, default: "Other" },
     thumbnail: { type: String, default: "" },
+    // Second of the video to show as the preview frame when there is no thumbnail image.
+    thumbnailTime: { type: Number, default: 0.5, min: 0 },
   },
   {
     timestamps: true,

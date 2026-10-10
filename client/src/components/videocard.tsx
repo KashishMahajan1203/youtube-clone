@@ -10,7 +10,7 @@ export default function VideoCard({ video }: any) {
       href={`/watch/${video?._id}`}
       className="group block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <VideoThumbnail filepath={video?.filepath} thumbnail={video?.thumbnail} title={video?.videotitle} />
+      <VideoThumbnail filepath={video?.filepath} thumbnail={video?.thumbnail} frameAt={video?.thumbnailTime} title={video?.videotitle} />
       <div className="mt-3 flex gap-3">
         <ChannelAvatar name={video?.videochanel} className="mt-0.5" />
         <div className="min-w-0 flex-1">

@@ -57,6 +57,7 @@ export default function VideoRow({
         <VideoThumbnail
           filepath={video.filepath}
           thumbnail={video.thumbnail}
+          frameAt={video.thumbnailTime}
           title={video.videotitle}
           rounded={compact ? "rounded-lg" : "rounded-xl"}
         />

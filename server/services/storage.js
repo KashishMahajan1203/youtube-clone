@@ -67,3 +67,12 @@ export async function discardLocal(localPath) {
     await fs.unlink(localPath).catch(() => {});
   }
 }
+
+// Cloudinary can render any frame of an uploaded video as an image:
+// .../video/upload/<id>.mp4  →  .../video/upload/so_<sec>/<id>.jpg
+export function cloudinaryFrameUrl(videoUrl, seconds = 1) {
+  if (!videoUrl?.includes("/video/upload/")) return "";
+  return videoUrl
+    .replace("/video/upload/", `/video/upload/so_${seconds}/`)
+    .replace(/\.[a-z0-9]+(\?.*)?$/i, ".jpg");
+}

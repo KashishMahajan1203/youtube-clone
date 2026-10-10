@@ -7,6 +7,8 @@ interface VideoThumbnailProps {
   filepath?: string;
   /** Uploaded thumbnail image. Without one, a frame of the video is used. */
   thumbnail?: string;
+  /** Second to show as the preview frame when there is no image. */
+  frameAt?: number;
   title?: string;
   className?: string;
   /** Play a muted preview while hovered. */
@@ -17,6 +19,7 @@ interface VideoThumbnailProps {
 export default function VideoThumbnail({
   filepath,
   thumbnail,
+  frameAt = 0.5,
   title,
   className,
   preview = true,
@@ -51,7 +54,7 @@ export default function VideoThumbnail({
     setPlaying(false);
     if (!ref.current) return;
     ref.current.pause();
-    ref.current.currentTime = 0.5;
+    ref.current.currentTime = frameAt;
   };
 
   const loading = hasImage ? !imageReady : !videoReady && !videoFailed;
@@ -85,7 +88,7 @@ export default function VideoThumbnail({
       {mountVideo && (
         <video
           ref={ref}
-          src={`${src}#t=0.5`}
+          src={`${src}#t=${frameAt}`}
           muted
           playsInline
           loop

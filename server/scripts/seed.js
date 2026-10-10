@@ -10,11 +10,18 @@
  *
  * Sample clips are short excerpts of open movies by the Blender Foundation
  * (Big Buck Bunny, Sintel — CC BY 3.0) and a public-domain jellyfish clip,
- * downloaded from test-videos.co.uk and stored like any upload (Cloudinary
- * when configured, otherwise ./uploads).
+ * from test-videos.co.uk.
+ *
+ * Media:
+ * - With Cloudinary configured, the clips are uploaded there and Cloudinary
+ *   renders a different frame of each video as its thumbnail image.
+ * - Without it, the clips' public URLs are stored directly. Local file paths
+ *   are deliberately not used: the database may be shared with a deployed
+ *   server (e.g. MongoDB Atlas + Render) that wouldn't have those files.
  */
 import dotenv from "dotenv";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import mongoose from "mongoose";
@@ -29,13 +36,10 @@ import download from "../Modals/download.js";
 import subscription from "../Modals/subscription.js";
 import playlist from "../Modals/playlist.js";
 import notification from "../Modals/notification.js";
-import { persistUpload } from "../services/storage.js";
+import { persistUpload, isCloudStorageEnabled, cloudinaryFrameUrl } from "../services/storage.js";
 import { DEMO_EMAIL_DOMAIN, DEMO_USER } from "../constants/demo.js";
 
 dotenv.config();
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOADS = path.join(__dirname, "..", "uploads");
 
 const CLIPS = {
   bunny: "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_5MB.mp4",
@@ -68,67 +72,80 @@ const CREATORS = [
 ];
 
 const day = 24 * 60 * 60 * 1000;
+const BLENDER = "© Blender Foundation | www.blender.org — CC BY 3.0";
+
+// `at` is the second of the clip used for the thumbnail, so videos that
+// share a source clip still look different on the home grid.
 const VIDEOS = [
-  { by: "studio", clip: "bunny", category: "Entertainment", ago: 2, views: 18420, likes: 1210,
+  { by: "studio", clip: "bunny", at: 1, category: "Entertainment", ago: 2, views: 18420, likes: 1210,
     title: "Big Buck Bunny — the opening scene",
-    description: "The gentle opening of Big Buck Bunny, the Blender Foundation's open movie.\n\n© Blender Foundation | peach.blender.org — CC BY 3.0" },
-  { by: "studio", clip: "sintel", category: "Entertainment", ago: 6, views: 9730, likes: 845,
+    description: `The gentle opening of Big Buck Bunny, the Blender Foundation's open movie.\n\n${BLENDER}` },
+  { by: "studio", clip: "sintel", at: 2, category: "Entertainment", ago: 6, views: 9730, likes: 845,
     title: "Sintel — a moment from the open movie",
-    description: "A short excerpt from Sintel, an open fantasy film about a girl searching for her dragon.\n\n© Blender Foundation | durian.blender.org — CC BY 3.0" },
-  { by: "studio", clip: "bunny", category: "Comedy", ago: 15, views: 4310, likes: 390,
+    description: `A short excerpt from Sintel, an open fantasy film about a girl searching for her dragon.\n\n${BLENDER}` },
+  { by: "studio", clip: "bunny", at: 7, category: "Comedy", ago: 15, views: 4310, likes: 390,
     title: "When the bunny finally wakes up",
-    description: "Peace, quiet, and a very big rabbit.\n\n© Blender Foundation — CC BY 3.0" },
-  { by: "ocean", clip: "jellyfish", category: "Science", ago: 1, views: 25890, likes: 2034,
+    description: `Peace, quiet, and a very big rabbit.\n\n${BLENDER}` },
+  { by: "studio", clip: "sintel", at: 8, category: "Entertainment", ago: 40, views: 15600, likes: 1320,
+    title: "Sintel's final shot, ten seconds at a time",
+    description: `Atmosphere, colour and a lot of snow.\n\n${BLENDER}` },
+  { by: "ocean", clip: "jellyfish", at: 1, category: "Science", ago: 1, views: 25890, likes: 2034,
     title: "Jellyfish drifting in HD — 10 second calm",
     description: "Ten seconds of jellyfish to reset your brain between tasks." },
-  { by: "ocean", clip: "jellyfish", category: "Travel", ago: 9, views: 7120, likes: 512,
+  { by: "ocean", clip: "jellyfish", at: 4, category: "Travel", ago: 9, views: 7120, likes: 512,
     title: "Inside a public aquarium: the jellyfish tank",
     description: "Glowing jellyfish, filmed up close." },
-  { by: "ocean", clip: "jellyfish", category: "Lifestyle", ago: 30, views: 3150, likes: 288,
+  { by: "ocean", clip: "jellyfish", at: 8, category: "Lifestyle", ago: 30, views: 3150, likes: 288,
     title: "Focus loop: jellyfish ambience",
     description: "Put it on loop while you study or code." },
-  { by: "frames", clip: "sintel", category: "Education", ago: 3, views: 11240, likes: 977,
+  { by: "ocean", clip: "jellyfish", at: 6, category: "Music", ago: 18, views: 5400, likes: 610,
+    title: "Lo-fi visuals: jellyfish for your study playlist",
+    description: "Add your favourite lo-fi track and let it run." },
+  { by: "frames", clip: "sintel", at: 4, category: "Education", ago: 3, views: 11240, likes: 977,
     title: "How Sintel uses light to tell a story",
-    description: "A look at lighting and colour in the open movie Sintel.\n\nFootage © Blender Foundation — CC BY 3.0" },
-  { by: "frames", clip: "bunny", category: "Education", ago: 12, views: 6480, likes: 601,
+    description: `A look at lighting and colour in the open movie Sintel.\n\nFootage ${BLENDER}` },
+  { by: "frames", clip: "bunny", at: 4, category: "Education", ago: 12, views: 6480, likes: 601,
     title: "Animation basics: squash and stretch in Big Buck Bunny",
-    description: "One of the twelve principles of animation, in a ten-second clip.\n\nFootage © Blender Foundation — CC BY 3.0" },
-  { by: "frames", clip: "sintel", category: "Technology", ago: 21, views: 2890, likes: 240,
+    description: `One of the twelve principles of animation, in a ten-second clip.\n\nFootage ${BLENDER}` },
+  { by: "frames", clip: "sintel", at: 6, category: "Technology", ago: 21, views: 2890, likes: 240,
     title: "Rendering Sintel: what an open movie pipeline looks like",
-    description: "Blender, render farms and open assets.\n\nFootage © Blender Foundation — CC BY 3.0" },
+    description: `Blender, render farms and open assets.\n\nFootage ${BLENDER}` },
+  { by: "frames", clip: "bunny", at: 9, category: "Gaming", ago: 26, views: 8120, likes: 702,
+    title: "Could Big Buck Bunny be a video game level?",
+    description: `Looking at the forest set like a level designer would.\n\nFootage ${BLENDER}` },
 ];
 
 const COMMENTS = [
   { on: 0, by: "demo", text: "Such a beautiful film, and it's open source!", city: "Bengaluru" },
   { on: 0, by: "frames", text: "The lighting in this opening is a masterclass.", city: "Mumbai" },
-  { on: 3, by: "studio", text: "Watching this between meetings is my new habit.", city: "Delhi" },
-  { on: 6, by: "demo", text: "Great breakdown — never noticed the colour shift before.", city: "Pune" },
+  { on: 4, by: "studio", text: "Watching this between meetings is my new habit.", city: "Delhi" },
+  { on: 8, by: "demo", text: "Great breakdown — never noticed the colour shift before.", city: "Pune" },
   { on: 1, by: "ocean", text: "Sintel still gives me chills.", city: "Chandigarh" },
 ];
 
-async function downloadClip(name, url) {
-  const dest = path.join(UPLOADS, `seed-${name}.mp4`);
-  if (!fs.existsSync(dest)) {
-    console.log(`  downloading ${name}…`);
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Download failed for ${name}: ${res.status}`);
-    fs.writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
-  }
-  return dest;
+// Upload a clip to Cloudinary (via a temp file, which persistUpload removes).
+async function uploadClip(name, url) {
+  console.log(`  uploading ${name} to Cloudinary…`);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Download failed for ${name}: ${res.status}`);
+  const tmp = path.join(os.tmpdir(), `yourtube-seed-${name}-${Date.now()}.mp4`);
+  fs.writeFileSync(tmp, Buffer.from(await res.arrayBuffer()));
+  return persistUpload(tmp, "video");
 }
 
-// Store a clip the same way real uploads are stored. persistUpload removes
-// the local file after a Cloudinary upload, so hand it a copy.
-async function storeClip(name, localPath) {
-  const copy = path.join(UPLOADS, `seed-${name}-${Date.now()}.mp4`);
-  fs.copyFileSync(localPath, copy);
-  const stored = await persistUpload(copy, "video");
-  if (stored === copy) {
-    // Local storage: keep a stable file name instead of the timestamped copy.
-    fs.unlinkSync(copy);
-    return path.relative(path.join(__dirname, ".."), localPath).replace(/\\/g, "/");
+async function prepareMedia() {
+  const cloud = isCloudStorageEnabled();
+  if (!cloud) {
+    console.warn(
+      "  Cloudinary not configured: storing the clips' public URLs directly.\n" +
+        "  Set CLOUDINARY_* in .env to host them yourself with image thumbnails."
+    );
   }
-  return stored;
+  const media = {};
+  for (const [name, url] of Object.entries(CLIPS)) {
+    media[name] = cloud ? await uploadClip(name, url) : url;
+  }
+  return { media, cloud };
 }
 
 async function removeSeedData() {
@@ -156,17 +173,12 @@ async function removeSeedData() {
 }
 
 export async function seed() {
-  fs.mkdirSync(UPLOADS, { recursive: true });
-
   console.log("Removing previous seed data…");
   const removed = await removeSeedData();
   console.log(`  removed ${removed} seed videos`);
 
   console.log("Preparing sample clips…");
-  const stored = {};
-  for (const [name, url] of Object.entries(CLIPS)) {
-    stored[name] = await storeClip(name, await downloadClip(name, url));
-  }
+  const { media, cloud } = await prepareMedia();
 
   console.log("Creating channels…");
   const creators = {};
@@ -193,14 +205,15 @@ export async function seed() {
       description: v.description,
       category: v.category,
       filename: `${v.clip}.mp4`,
-      filepath: stored[v.clip],
+      filepath: media[v.clip],
       filetype: "video/mp4",
-      filesize: "5MB",
+      filesize: "5242880",
       videochanel: owner.channelname,
       uploader: String(owner._id),
       views: v.views,
       Like: v.likes,
-      thumbnail: "",
+      thumbnail: cloud ? cloudinaryFrameUrl(media[v.clip], v.at) : "",
+      thumbnailTime: v.at,
     });
     // timestamps are managed by mongoose; backdate directly for a realistic feed
     await video.collection.updateOne({ _id: doc._id }, { $set: { createdAt: created, updatedAt: created } });
@@ -234,9 +247,9 @@ export async function seed() {
 
   // The demo user's library
   await like.create({ viewer: demo._id, videoid: videoDocs[0]._id, type: "like" });
-  await like.create({ viewer: demo._id, videoid: videoDocs[6]._id, type: "like" });
-  await watchlater.create({ viewer: demo._id, videoid: videoDocs[7]._id });
-  for (const i of [3, 0, 6]) {
+  await like.create({ viewer: demo._id, videoid: videoDocs[8]._id, type: "like" });
+  await watchlater.create({ viewer: demo._id, videoid: videoDocs[9]._id });
+  for (const i of [4, 0, 8]) {
     await history.create({ viewer: demo._id, videoid: videoDocs[i]._id });
   }
   await playlist.create({
@@ -244,15 +257,15 @@ export async function seed() {
     title: "Open movie favourites",
     description: "The best bits from Blender's open movies.",
     visibility: "public",
-    videos: [videoDocs[0]._id, videoDocs[1]._id, videoDocs[6]._id, videoDocs[7]._id],
+    videos: [videoDocs[0]._id, videoDocs[1]._id, videoDocs[8]._id, videoDocs[9]._id],
   });
   await notification.create({
     recipient: demo._id,
     type: "upload",
     actor: creators.ocean._id,
     actorName: creators.ocean.channelname,
-    video: videoDocs[3]._id,
-    videoTitle: videoDocs[3].videotitle,
+    video: videoDocs[4]._id,
+    videoTitle: videoDocs[4].videotitle,
   });
 
   console.log(`\nDone: ${CREATORS.length} channels, ${videoDocs.length} videos, demo account ${DEMO_USER.email}`);
