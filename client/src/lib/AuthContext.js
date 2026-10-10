@@ -204,14 +204,20 @@ export const UserProvider = ({ children }) => {
       console.log(`OTP Method: ${otpMethod}, IsSignup: ${isSignup}, Location: ${currentLoc.region_name}`);
 
       if (otpMethod === 'email') {
-        // Use backend email OTP
-        const sanitizedMobile = (mobile || "").replace(/\\s+|-/g, "");
-        await axiosInstance.post("/user/send-otp", {
-          email: firebaseuser.email,
-          mobile: sanitizedMobile,
-          name: firebaseuser.displayName,
-          image: firebaseuser.photoURL || "https://github.com/shadcn.png"
-        });
+        // The first /send-otp call above already emails a code when the
+        // server picks the email method. Calling it again would send a
+        // second code and invalidate the first one ("Invalid OTP").
+        const alreadySent =
+          checkUserResponse.data.method === 'email' && !checkUserResponse.data.mobileRequired;
+        if (!alreadySent) {
+          const sanitizedMobile = (mobile || "").replace(/\\s+|-/g, "");
+          await axiosInstance.post("/user/send-otp", {
+            email: firebaseuser.email,
+            mobile: sanitizedMobile,
+            name: firebaseuser.displayName,
+            image: firebaseuser.photoURL || "https://github.com/shadcn.png"
+          });
+        }
 
         setOtpRequired(true);
         otpRequiredRef.current = true;

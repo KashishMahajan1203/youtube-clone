@@ -167,7 +167,10 @@ export const sendOTP = async (req, res) => {
     }
 
     const otp = generateOTP();
-    console.log(`Generated OTP: ${otp} for ${email} via ${method}`);
+    // Handy while developing (no inbox needed); never log codes in production.
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[dev] OTP for ${email}: ${otp} (via ${method})`);
+    }
 
     let otpSent = false;
     let actualMethod = method;
