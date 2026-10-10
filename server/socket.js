@@ -45,11 +45,11 @@ export function initializeSocket(server) {
       socket.data.userId = null;
     });
 
-    // Create a new room
+    // Create a new room. The creator isn't added as a participant: the call
+    // page opens its own socket and joins with that, like everyone else.
     socket.on('create-room', (callback) => {
       const roomId = uuidv4();
-      rooms.set(roomId, { participants: [socket.id], host: socket.id });
-      socket.join(roomId);
+      rooms.set(roomId, { participants: [], host: socket.id });
       callback({ roomId });
       console.log(`Room created: ${roomId}`);
     });
@@ -58,38 +58,34 @@ export function initializeSocket(server) {
     socket.on('join-room', (roomId, callback) => {
       let room = rooms.get(roomId);
       if (!room) {
-        // Create the room if it doesn't exist
         room = { participants: [], host: socket.id };
         rooms.set(roomId, room);
         console.log(`Room created: ${roomId}`);
       }
+      // Drop sockets that have gone away without a clean leave.
+      room.participants = room.participants.filter((id) => io.sockets.sockets.has(id));
       if (!room.participants.includes(socket.id)) {
         room.participants.push(socket.id);
       }
       socket.join(roomId);
       socket.to(roomId).emit('user-joined', socket.id);
-      callback({ success: true, participants: room.participants });
-      console.log(`User ${socket.id} joined room: ${roomId}`);
+      if (typeof callback === 'function') {
+        callback({ success: true, participants: room.participants });
+      }
+      console.log(`User ${socket.id} joined room: ${roomId} (${room.participants.length} in call)`);
     });
 
-    // WebRTC signaling
-    socket.on('offer', (data) => {
-      // Broadcast offer to the room
-      socket.to(data.roomId).emit('offer', { offer: data.offer, from: socket.id });
-      console.log(`Broadcast offer from ${socket.id} to room ${data.roomId}`);
-    });
-
-    socket.on('answer', (data) => {
-      // Broadcast answer to the room
-      socket.to(data.roomId).emit('answer', { answer: data.answer, from: socket.id });
-      console.log(`Broadcast answer from ${socket.id} to room ${data.roomId}`);
-    });
-
-    socket.on('ice-candidate', (data) => {
-      // Broadcast ICE candidate to the room
-      socket.to(data.roomId).emit('ice-candidate', { candidate: data.candidate, from: socket.id });
-      console.log(`Broadcast ICE candidate from ${socket.id} to room ${data.roomId}`);
-    });
+    // WebRTC signalling: relay each message to the one peer it is meant for.
+    const relay = (event, payloadKey) => (data) => {
+      if (!data || typeof data.to !== 'string') return;
+      const target = io.sockets.sockets.get(data.to);
+      // Only relay between members of the same call.
+      if (!target || !target.rooms.has(data.roomId) || !socket.rooms.has(data.roomId)) return;
+      target.emit(event, { from: socket.id, [payloadKey]: data[payloadKey] });
+    };
+    socket.on('offer', relay('offer', 'offer'));
+    socket.on('answer', relay('answer', 'answer'));
+    socket.on('ice-candidate', relay('ice-candidate', 'candidate'));
 
     // Screen sharing
     socket.on('start-screen-share', (roomId) => {

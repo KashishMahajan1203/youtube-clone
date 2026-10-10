@@ -27,6 +27,15 @@ interface JoinRoomResponse {
   error?: string;
 }
 
+/*
+ * Mesh WebRTC for small calls.
+ *
+ * Signalling rules (avoid "glare", where both sides offer at once):
+ * - A peer that joins sends an offer to everyone already in the room.
+ * - Peers already in the room never initiate; they only answer.
+ * Every offer/answer/candidate is addressed to one peer (`to`), and ICE
+ * candidates that arrive before the remote description are queued.
+ */
 export const useWebRTC = ({ socket, roomId }: UseWebRTCProps): {
   localStream: MediaStream | null;
   remoteStreams: Map<string, MediaStream>;
@@ -44,257 +53,193 @@ export const useWebRTC = ({ socket, roomId }: UseWebRTCProps): {
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const srcObjectSetRef = useRef<boolean>(false);
+  const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const localStreamRef = useRef<MediaStream | null>(null);
 
-  const configuration = { iceServers: ICE_SERVERS };
+  const removePeer = useCallback((peerId: string) => {
+    peerConnectionsRef.current.get(peerId)?.close();
+    peerConnectionsRef.current.delete(peerId);
+    pendingCandidatesRef.current.delete(peerId);
+    setRemoteStreams((prev) => {
+      if (!prev.has(peerId)) return prev;
+      const next = new Map(prev);
+      next.delete(peerId);
+      return next;
+    });
+  }, []);
 
   const createPeerConnection = useCallback((peerId: string) => {
-    // Check if connection already exists
-    if (peerConnectionsRef.current.has(peerId)) {
-      return peerConnectionsRef.current.get(peerId)!;
-    }
+    const existing = peerConnectionsRef.current.get(peerId);
+    if (existing) return existing;
 
-    const pc = new RTCPeerConnection(configuration);
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
     pc.onicecandidate = (event) => {
       if (event.candidate && socket) {
-        socket.emit('ice-candidate', {
-          roomId,
-          candidate: event.candidate,
-          from: socket.id,
-        });
+        socket.emit('ice-candidate', { roomId, to: peerId, candidate: event.candidate.toJSON() });
       }
     };
 
     pc.ontrack = (event) => {
-      console.log('Received remote stream for peer:', peerId, 'stream:', event.streams[0], 'tracks:', event.streams[0].getTracks().map(t => t.kind + ':' + t.enabled));
-      const remoteStream = event.streams[0];
-      console.log('Remote stream id:', remoteStream.id, 'active:', remoteStream.active);
-
+      const stream = event.streams[0] ?? new MediaStream([event.track]);
       setRemoteStreams((prev) => {
-        const newStreams = new Map(prev);
-        newStreams.set(peerId, remoteStream);
-        console.log('Updated remoteStreams:', Array.from(newStreams.keys()), 'sizes:', Array.from(newStreams.values()).map(s => s.getTracks().length));
-        return newStreams;
+        const next = new Map(prev);
+        next.set(peerId, stream);
+        return next;
       });
     };
- 
+
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-        // Clean up failed connections
-        peerConnectionsRef.current.delete(peerId);
-        setRemoteStreams((prev) => {
-          const newStreams = new Map(prev);
-          newStreams.delete(peerId);
-          return newStreams;
-        });
+      // "disconnected" can recover on its own; "failed" can't.
+      if (pc.connectionState === 'failed') {
+        console.warn('WebRTC connection failed with', peerId, '— a TURN server may be needed on this network');
+        removePeer(peerId);
       }
     };
 
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => {
-        pc.addTrack(track, localStreamRef.current!);
-      });
+    const stream = localStreamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+    } else {
+      // No camera/mic (denied or unavailable): still receive the other side.
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+      pc.addTransceiver('video', { direction: 'recvonly' });
     }
 
     peerConnectionsRef.current.set(peerId, pc);
     return pc;
-  }, [localStream, socket, roomId, configuration]);
+  }, [socket, roomId, removePeer]);
 
-  const createOffer = useCallback(async (peerId: string) => {
-    const pc = createPeerConnection(peerId);
-    // Allow offer creation in stable state or when we have local offer
-    if (pc.signalingState === 'closed' || pc.signalingState === 'have-remote-offer') {
-      console.log('Skipping offer creation, signaling state:', pc.signalingState);
-      return;
+  const flushCandidates = async (peerId: string, pc: RTCPeerConnection) => {
+    const queued = pendingCandidatesRef.current.get(peerId) ?? [];
+    pendingCandidatesRef.current.delete(peerId);
+    for (const candidate of queued) {
+      try {
+        await pc.addIceCandidate(candidate);
+      } catch (error) {
+        console.warn('Dropped ICE candidate from', peerId, error);
+      }
     }
+  };
 
+  const sendOffer = useCallback(async (peerId: string) => {
+    if (!socket) return;
+    const pc = createPeerConnection(peerId);
     try {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      console.log('Created offer for peer:', peerId, 'signaling state:', pc.signalingState);
-
-      if (socket) {
-        socket.emit('offer', { roomId, offer, from: socket.id });
-      }
+      socket.emit('offer', { roomId, to: peerId, offer: pc.localDescription });
     } catch (error) {
-      console.error('Error creating offer for peer:', peerId, error);
+      console.error('Error creating offer for', peerId, error);
     }
-  }, [createPeerConnection, socket, roomId]);
-
-  const createAnswer = useCallback(async (peerId: string, offer: RTCSessionDescriptionInit) => {
-    const pc = createPeerConnection(peerId);
-
-    try {
-      // Handle offer collision (perfect negotiation pattern)
-      if (pc.signalingState === 'have-local-offer') {
-        // We have a local offer, but received a remote offer - rollback and accept remote offer
-        console.log('Offer collision detected for peer:', peerId, '- rolling back local offer');
-        await pc.setLocalDescription({ type: 'rollback' });
-      }
-
-      await pc.setRemoteDescription(offer);
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      console.log('Created answer for peer:', peerId, 'signaling state:', pc.signalingState);
-
-      if (socket) {
-        socket.emit('answer', { roomId, answer, from: socket.id });
-      }
-    } catch (error) {
-      console.error('Error creating answer for peer:', peerId, error);
-    }
-  }, [createPeerConnection, socket, roomId]);
+  }, [socket, roomId, createPeerConnection]);
 
   const startLocalStream = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
-      console.log('Local stream obtained, tracks:', stream.getTracks().map(t => t.kind + ':' + t.enabled));
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setLocalStream(stream);
       localStreamRef.current = stream;
     } catch (error) {
-      console.error('Error accessing media devices:', error);
+      console.error('Error accessing camera/microphone:', error);
+      // Try audio only, then carry on receive-only.
+      try {
+        const audio = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setLocalStream(audio);
+        localStreamRef.current = audio;
+      } catch {
+        /* receive-only */
+      }
     }
   }, []);
 
   const joinRoom = useCallback(async () => {
     if (!socket) return;
-
-    console.log('Joining room:', roomId, 'socket id:', socket.id);
     socket.emit('join-room', roomId, (response: JoinRoomResponse) => {
-      console.log('Join room response:', response);
-      if (response.success) {
-        setParticipants(response.participants);
-        setIsConnected(true);
-        console.log('Participants:', response.participants);
-
-        // Create offers to all other participants to ensure bidirectional connections
-        if (socket.id) {
-          response.participants.forEach((peerId: string) => {
-            if (peerId !== socket.id && !peerConnectionsRef.current.has(peerId)) {
-              console.log('Creating offer to participant:', peerId);
-              createOffer(peerId);
-            }
-          });
-        }
-      }
+      if (!response?.success) return;
+      setParticipants(response.participants);
+      setIsConnected(true);
+      // We're the newcomer: offer to everyone already here.
+      response.participants
+        .filter((peerId) => peerId !== socket.id)
+        .forEach((peerId) => sendOffer(peerId));
     });
-  }, [socket, roomId, createOffer]);
+  }, [socket, roomId, sendOffer]);
 
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('user-joined', (peerId: string) => {
-      console.log('User joined:', peerId);
-      setParticipants((prev) => {
-        if (!prev.includes(peerId)) {
-          return [...prev, peerId];
-        }
-        return prev;
-      });
-      // Create offer to the new user if we have local stream
-      if (localStream && peerId !== socket.id && socket.id) {
-        createOffer(peerId);
-      }
-    });
+    const onUserJoined = (peerId: string) => {
+      // The newcomer will send us an offer; just track them.
+      setParticipants((prev) => (prev.includes(peerId) ? prev : [...prev, peerId]));
+    };
 
-    socket.on('user-left', (peerId: string) => {
-      setParticipants((prev) => prev.filter(id => id !== peerId));
-      setRemoteStreams((prev) => {
-        const newStreams = new Map(prev);
-        newStreams.delete(peerId);
-        return newStreams;
-      });
-      peerConnectionsRef.current.delete(peerId);
-    });
+    const onUserLeft = (peerId: string) => {
+      setParticipants((prev) => prev.filter((id) => id !== peerId));
+      removePeer(peerId);
+    };
 
-    socket.on('offer', async (data: { offer: RTCSessionDescriptionInit; from: string }) => {
-      if (data.from !== socket.id) {
-        await createAnswer(data.from, data.offer);
+    const onOffer = async ({ from, offer }: { from: string; offer: RTCSessionDescriptionInit }) => {
+      if (!from || from === socket.id) return;
+      const pc = createPeerConnection(from);
+      try {
+        await pc.setRemoteDescription(offer);
+        await flushCandidates(from, pc);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        socket.emit('answer', { roomId, to: from, answer: pc.localDescription });
+      } catch (error) {
+        console.error('Error answering offer from', from, error);
       }
-    });
+    };
 
-    socket.on('answer', async (data: { answer: RTCSessionDescriptionInit; from: string }) => {
-      if (data.from !== socket.id) {
-        const pc = peerConnectionsRef.current.get(data.from);
-        if (pc && pc.signalingState === 'have-local-offer') {
-          await pc.setRemoteDescription(data.answer);
-        } else {
-          console.log('Skipping answer setRemoteDescription, signaling state:', pc?.signalingState);
-        }
+    const onAnswer = async ({ from, answer }: { from: string; answer: RTCSessionDescriptionInit }) => {
+      const pc = peerConnectionsRef.current.get(from);
+      if (!pc || pc.signalingState !== 'have-local-offer') return;
+      try {
+        await pc.setRemoteDescription(answer);
+        await flushCandidates(from, pc);
+      } catch (error) {
+        console.error('Error applying answer from', from, error);
       }
-    });
+    };
 
-    socket.on('ice-candidate', async (data: { candidate: RTCIceCandidateInit; from: string }) => {
-      if (data.from !== socket.id) {
-        const pc = peerConnectionsRef.current.get(data.from);
-        if (pc) {
-          await pc.addIceCandidate(data.candidate);
-        }
+    const onIceCandidate = async ({ from, candidate }: { from: string; candidate: RTCIceCandidateInit }) => {
+      if (!candidate) return;
+      const pc = peerConnectionsRef.current.get(from);
+      if (!pc || !pc.remoteDescription) {
+        const queue = pendingCandidatesRef.current.get(from) ?? [];
+        queue.push(candidate);
+        pendingCandidatesRef.current.set(from, queue);
+        return;
       }
-    });
+      try {
+        await pc.addIceCandidate(candidate);
+      } catch (error) {
+        console.warn('Dropped ICE candidate from', from, error);
+      }
+    };
+
+    socket.on('user-joined', onUserJoined);
+    socket.on('user-left', onUserLeft);
+    socket.on('offer', onOffer);
+    socket.on('answer', onAnswer);
+    socket.on('ice-candidate', onIceCandidate);
 
     return () => {
-      socket.off('user-joined');
-      socket.off('user-left');
-      socket.off('offer');
-      socket.off('answer');
-      socket.off('ice-candidate');
+      socket.off('user-joined', onUserJoined);
+      socket.off('user-left', onUserLeft);
+      socket.off('offer', onOffer);
+      socket.off('answer', onAnswer);
+      socket.off('ice-candidate', onIceCandidate);
     };
-  }, [socket, createOffer, createAnswer, localStream]);
-
-  // Add tracks to existing peer connections when localStream becomes available
-  useEffect(() => {
-    if (localStream) {
-      console.log('Local stream available, adding tracks to existing peer connections');
-      peerConnectionsRef.current.forEach(async (pc, peerId) => {
-        const senders = pc.getSenders();
-        const hasVideoTrack = senders.some(sender => sender.track?.kind === 'video');
-        const hasAudioTrack = senders.some(sender => sender.track?.kind === 'audio');
-
-        let tracksAdded = false;
-        if (!hasVideoTrack || !hasAudioTrack) {
-          localStream.getTracks().forEach((track) => {
-            const existingSender = senders.find(sender => sender.track?.kind === track.kind);
-            if (!existingSender) {
-              console.log('Adding track to existing peer connection:', peerId, track.kind);
-              pc.addTrack(track, localStream);
-              tracksAdded = true;
-            }
-          });
-        }
-
-        // If tracks were added and we're in a stable state, renegotiate
-        if (tracksAdded && pc.signalingState === 'stable' && socket) {
-          console.log('Renegotiating offer for peer:', peerId);
-          try {
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            socket.emit('offer', { roomId, offer, from: socket.id });
-          } catch (error) {
-            console.error('Error renegotiating offer for peer:', peerId, error);
-          }
-        }
-      });
-    }
-  }, [localStream, socket, roomId]);
-
-
+  }, [socket, roomId, createPeerConnection, removePeer]);
 
   useEffect(() => {
-    if (localVideoRef.current && localStream && !srcObjectSetRef.current) {
-      // console.log('Setting srcObject in useEffect');
+    if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
-      localVideoRef.current.play().catch(e => console.log('Play failed:', e));
-      srcObjectSetRef.current = true;
+      localVideoRef.current.play().catch(() => {});
     }
   }, [localStream]);
-
-
 
   const leaveRoom = useCallback(() => {
     if (socket) {
@@ -303,14 +248,13 @@ export const useWebRTC = ({ socket, roomId }: UseWebRTCProps): {
     setIsConnected(false);
     setParticipants([]);
     setRemoteStreams(new Map());
-    peerConnectionsRef.current.forEach(pc => pc.close());
+    peerConnectionsRef.current.forEach((pc) => pc.close());
     peerConnectionsRef.current.clear();
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-      setLocalStream(null);
-    }
-    srcObjectSetRef.current = false;
-  }, [socket, roomId, localStream]);
+    pendingCandidatesRef.current.clear();
+    localStreamRef.current?.getTracks().forEach((track) => track.stop());
+    localStreamRef.current = null;
+    setLocalStream(null);
+  }, [socket, roomId]);
 
   return {
     localStream,
