@@ -1,0 +1,37 @@
+services:
+  - type: web
+    name: youtube-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    # Add your environment variables here (or set them in Render dashboard)
+    # - key: JWT_SECRET   (required — the server refuses to start without it)
+    #   generateValue: true
+    # - key: DB_URL
+    #   value: your_mongodb_connection_string
+    # - key: TWILIO_SID
+    #   value: your_twilio_sid
+    # - key: TWILIO_AUTH_TOKEN
+    #   value: your_twilio_auth_token
+    # - key: TWILIO_PHONE_NUMBER
+    #   value: your_twilio_phone_number
+    # - key: EMAIL_USER
+    #   value: your_email@gmail.com
+    # - key: EMAIL_PASS
+    #   value: your_email_app_password
+    # Media storage — without these, uploads go to ./uploads, which Render
+    # wipes on every deploy. Free account: https://cloudinary.com
+    # - key: CLOUDINARY_CLOUD_NAME
+    #   value: your_cloud_name
+    # - key: CLOUDINARY_API_KEY
+    #   value: your_api_key
+    # - key: CLOUDINARY_API_SECRET
+    #   value: your_api_secret
+    # Extra frontend origins allowed by CORS/Socket.IO (comma-separated)
+    # - key: CLIENT_URL
+    #   value: https://your-frontend.vercel.app

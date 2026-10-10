@@ -1,0 +1,6 @@
+
+# User uploads and seed clips (stored on Cloudinary in production)
+server/uploads/*
+!server/uploads/.gitkeep
+node_modules/
+.env
