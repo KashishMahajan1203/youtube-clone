@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Server · API tests
+    # mongodb-memory-server ships MongoDB binaries built for Ubuntu 22.04
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: server
+    env:
+      JWT_SECRET: ci-test-secret
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Cache MongoDB binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('server/package-lock.json') }}
+
+      - run: npm ci
+      - run: npm test
+
+  client:
+    name: Client · type-check & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    env:
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:5001
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - run: npm ci
+      - name: Type-check
+        run: npx tsc --noEmit
+      - name: Build
+        run: npm run build
