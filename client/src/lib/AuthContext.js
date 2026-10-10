@@ -154,7 +154,9 @@ export const UserProvider = ({ children }) => {
         clearTimeout(timeoutId);
 
         if (locRes.ok) {
-          currentLoc = await locRes.json();
+          const loc = await locRes.json();
+          // ipapi.co names the field "region"; the rest of this file uses "region_name".
+          currentLoc = { ...loc, region_name: loc.region_name ?? loc.region };
           setLocation(currentLoc);
         }
       } catch (e) {
