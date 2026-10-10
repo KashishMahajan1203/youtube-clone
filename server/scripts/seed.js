@@ -38,6 +38,7 @@ import playlist from "../Modals/playlist.js";
 import notification from "../Modals/notification.js";
 import { persistUpload, isCloudStorageEnabled, cloudinaryFrameUrl } from "../services/storage.js";
 import { DEMO_EMAIL_DOMAIN, DEMO_USER } from "../constants/demo.js";
+import { connectDB } from "../services/db.js";
 
 dotenv.config();
 
@@ -277,8 +278,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error("DB_URL is not set. Add it to server/.env first.");
     process.exit(1);
   }
-  mongoose
-    .connect(process.env.DB_URL)
+  connectDB()
     .then(seed)
     .then(() => mongoose.disconnect())
     .catch(async (err) => {
