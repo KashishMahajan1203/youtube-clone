@@ -15,6 +15,7 @@ import subscriptionroutes from "./routes/subscription.js";
 import notificationroutes from "./routes/notification.js";
 import playlistroutes from "./routes/playlist.js";
 import studioroutes from "./routes/studio.js";
+import youtuberoutes from "./routes/youtube.js";
 import { getAllowedOrigins } from "./constants/origins.js";
 
 // Required for ES Modules (__dirname replacement)
@@ -94,6 +95,7 @@ export function createApp({ logRequests = true } = {}) {
   app.use("/notification", notificationroutes);
   app.use("/playlist", playlistroutes);
   app.use("/studio", studioroutes);
+  app.use("/youtube", youtuberoutes);
 
   return app;
 }

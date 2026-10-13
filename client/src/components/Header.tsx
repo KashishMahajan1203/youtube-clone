@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   ListVideo,
 } from "lucide-react";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { Button } from "./ui/button";
 import Link from "next/link";
 import { Input } from "./ui/input";
@@ -28,6 +28,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import Channeldialogue from "./channeldialogue";
 import Logo from "./Logo";
+import SearchBox from "./SearchBox";
 import { useRouter } from "next/router";
 import { useUser } from "@/lib/AuthContext";
 import { toast } from "sonner";
@@ -56,7 +57,6 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
     demoLogin,
   } = useUser();
 
-  const [searchQuery, setSearchQuery] = useState("");
   const [isdialogeopen, setisdialogeopen] = useState(false);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [otp, setOtp] = useState("");
@@ -64,34 +64,6 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
   const router = useRouter();
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isSigningInLoading, setIsSigningInLoading] = useState(false);
-  const searchRef = useRef<HTMLInputElement>(null);
-
-  // Keep the search box in sync with the URL, and focus it with "/".
-  useEffect(() => {
-    if (router.pathname === "/search" && typeof router.query.q === "string") {
-      setSearchQuery(router.query.q);
-    }
-  }, [router.pathname, router.query.q]);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (e.key !== "/" || target.isContentEditable) return;
-      if (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
-      e.preventDefault();
-      searchRef.current?.focus();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-      searchRef.current?.blur();
-    }
-  };
 
   const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,27 +150,12 @@ const Header = ({ toggleSidebar }: HeaderProps) => {
         </Button>
       )}
 
-      <form
-        onSubmit={handleSearch}
-        className={`${showMobileSearch ? 'flex' : 'hidden md:flex'} mx-auto max-w-xl flex-1`}
-        role="search"
-      >
-        <div className="group relative flex-1">
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-foreground" />
-          <Input
-            ref={searchRef}
-            type="search"
-            placeholder="Search videos and channels"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            autoFocus={showMobileSearch}
-            className="h-11 rounded-full border-white/10 bg-white/[0.04] pl-11 pr-12 text-sm placeholder:text-muted-foreground/80 transition-all hover:border-white/15 focus-visible:border-brand/50 focus-visible:bg-white/[0.06] focus-visible:ring-4 focus-visible:ring-brand/15"
-          />
-          <kbd className="pointer-events-none absolute right-4 top-1/2 hidden -translate-y-1/2 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground md:block">
-            /
-          </kbd>
-        </div>
-      </form>
+      <div className={`${showMobileSearch ? 'flex' : 'hidden md:flex'} mx-auto max-w-2xl flex-1`}>
+        <SearchBox
+          autoFocus={showMobileSearch}
+          onSearched={() => setShowMobileSearch(false)}
+        />
+      </div>
 
       <div className={`items-center gap-1.5 ${showMobileSearch ? 'hidden md:flex' : 'flex'}`}>
         <Button

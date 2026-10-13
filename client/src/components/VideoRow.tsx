@@ -4,6 +4,7 @@ import VideoThumbnail from "./VideoThumbnail";
 import ChannelAvatar from "./ChannelAvatar";
 import { cn } from "@/lib/utils";
 import { formatViews, timeAgo } from "@/lib/media";
+import { videoHref } from "@/lib/youtube";
 
 interface VideoRowProps {
   video: any;
@@ -18,6 +19,8 @@ interface VideoRowProps {
   href?: string;
   /** Highlight as the currently playing item (playlist queue). */
   active?: boolean;
+  /** Show the start of the description (search results). */
+  showDescription?: boolean;
 }
 
 // Horizontal video row used by history, liked, watch later, search and
@@ -30,9 +33,10 @@ export default function VideoRow({
   index,
   href: hrefProp,
   active,
+  showDescription,
 }: VideoRowProps) {
   if (!video) return null;
-  const href = hrefProp || `/watch/${video._id}`;
+  const href = hrefProp || videoHref(video);
 
   return (
     <div
@@ -59,6 +63,8 @@ export default function VideoRow({
           thumbnail={video.thumbnail}
           frameAt={video.thumbnailTime}
           title={video.videotitle}
+          duration={video.duration}
+          live={video.live}
           rounded={compact ? "rounded-lg" : "rounded-xl"}
         />
       </Link>
@@ -96,6 +102,12 @@ export default function VideoRow({
               </span>
             </div>
           </>
+        )}
+
+        {showDescription && video.description && (
+          <p className="mt-2 hidden text-xs text-muted-foreground sm:line-clamp-2">
+            {video.description}
+          </p>
         )}
 
         {note && (

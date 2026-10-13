@@ -3,14 +3,15 @@ import Link from "next/link";
 import VideoThumbnail from "./VideoThumbnail";
 import ChannelAvatar from "./ChannelAvatar";
 import { formatViews, timeAgo } from "@/lib/media";
+import { videoHref } from "@/lib/youtube";
 
 export default function VideoCard({ video }: any) {
   return (
     <Link
-      href={`/watch/${video?._id}`}
+      href={videoHref(video)}
       className="group block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <VideoThumbnail filepath={video?.filepath} thumbnail={video?.thumbnail} frameAt={video?.thumbnailTime} title={video?.videotitle} />
+      <VideoThumbnail filepath={video?.filepath} thumbnail={video?.thumbnail} frameAt={video?.thumbnailTime} title={video?.videotitle} duration={video?.duration} live={video?.live} />
       <div className="mt-3 flex gap-3">
         <ChannelAvatar name={video?.videochanel} className="mt-0.5" />
         <div className="min-w-0 flex-1">

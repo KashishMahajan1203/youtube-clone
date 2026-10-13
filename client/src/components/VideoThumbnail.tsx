@@ -14,6 +14,9 @@ interface VideoThumbnailProps {
   /** Play a muted preview while hovered. */
   preview?: boolean;
   rounded?: string;
+  /** Known length in seconds (YouTube videos); otherwise read from the file. */
+  duration?: number;
+  live?: boolean;
 }
 
 export default function VideoThumbnail({
@@ -24,9 +27,12 @@ export default function VideoThumbnail({
   className,
   preview = true,
   rounded = "rounded-xl",
+  duration: knownDuration,
+  live,
 }: VideoThumbnailProps) {
   const ref = useRef<HTMLVideoElement>(null);
-  const [duration, setDuration] = useState<number>();
+  const [loadedDuration, setDuration] = useState<number>();
+  const duration = knownDuration || loadedDuration;
   const [imageReady, setImageReady] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
@@ -119,7 +125,11 @@ export default function VideoThumbnail({
       {/* Subtle hover affordance */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
-      {duration ? (
+      {live ? (
+        <span className="absolute bottom-2 right-2 rounded-md bg-red-600 px-1.5 py-0.5 text-[11px] font-semibold uppercase text-white">
+          Live
+        </span>
+      ) : duration ? (
         <span className="absolute bottom-2 right-2 rounded-md bg-black/80 px-1.5 py-0.5 font-mono text-[11px] font-medium tabular-nums text-white backdrop-blur-sm">
           {formatDuration(duration)}
         </span>
